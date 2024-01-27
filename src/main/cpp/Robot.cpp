@@ -12,6 +12,7 @@
 #include <cameraserver/CameraServer.h>
 #include <cscore_oo.h>
 #include <frc/DigitalInput.h>
+#include <frc/Encoder.h>
 
 class Robot : public frc::TimedRobot {
  public:
@@ -47,6 +48,10 @@ class Robot : public frc::TimedRobot {
     }
   }
 
+  void driveFunction(){
+    m_robotDrive.ArcadeDrive(-m_controller.GetLeftY(), m_controller.GetRightX());
+  }
+
   void TeleopInit() override {}
 
   void TeleopPeriodic() override {
@@ -54,25 +59,37 @@ class Robot : public frc::TimedRobot {
 
   void TestInit() override {}
 
-  void testFunction() {
+  void limitSwitchTest() {
        //Drive with arcade style (use right stick to steer)
-       if (ourLimitSwitch.Get()) {
+       if (m_limitswitch.Get()) {
         m_robotDrive.ArcadeDrive(0.0, 0.0);
+        m_encoder.Reset();
        } else {
-         m_robotDrive.ArcadeDrive(-m_controller.GetAButton(),
-                              m_controller.GetBButton());
+         m_robotDrive.ArcadeDrive(-m_controller.GetLeftY(),
+                              m_controller.GetRightX());
        }
   }
 
   void TestPeriodic() override {
-    testFunction();
+    driveFunction();
+    limitSwitchTest();
 
-  if (m_controller.GetYButton()){
-    leftside_leader.Set(0.5);
-  }
-  else if (m_controller.GetXButton()){
-    rightside_leader.Set(0.5);
-  }
+    double encoderDistance = m_encoder.GetDistance();
+    std::cout << encoderDistance << "\n";
+
+    if (m_encoder.GetStopped()){
+      fmt::print("Going!\n");
+    }
+    else{
+      fmt::print("Stopped!\n");
+    }
+
+  // if (m_controller.GetYButton()){
+  //   leftside_leader.Set(0.5);
+  // }
+  // else if (m_controller.GetXButton()){
+  //   rightside_leader.Set(0.5);
+  // }
 
     // frc::PWMVictorSPX victor{0}; 
     // victor.Set(0.5);
@@ -93,7 +110,8 @@ class Robot : public frc::TimedRobot {
 
   frc::XboxController m_controller{1};
   frc::Timer m_timer;
-  frc::DigitalInput ourLimitSwitch{8};
+  frc::DigitalInput m_limitswitch{8};
+  frc::Encoder m_encoder{0,1};
 };
 
 #ifndef RUNNING_FRC_TESTS
