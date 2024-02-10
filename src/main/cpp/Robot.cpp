@@ -13,6 +13,11 @@
 #include <cscore_oo.h>
 #include <frc/DigitalInput.h>
 #include <frc/Encoder.h>
+#include <string>
+#include <frc/smartdashboard/SmartDashboard.h>
+
+
+// GLOBALS
 
 class Robot : public frc::TimedRobot {
  public:
@@ -29,72 +34,80 @@ class Robot : public frc::TimedRobot {
     rightside_follower.Follow(rightside_leader);
     m_robotDrive.SetExpiration(100_ms);
     m_timer.Start();
+    
 
     frc::CameraServer::StartAutomaticCapture();
 
   }
 
+class armClass {
+  public:
+    int position;
+    void move_arm(int increment){
+      std::cout << increment << "\n";
+    }
+};
 
   void AutonomousInit() override { m_timer.Restart(); }
 
   void AutonomousPeriodic() override {
     // Drive for 2 seconds
-    if (m_timer.Get() < 2_s) {
-      // Drive forwards half speed, make sure to turn input squaring off
-      m_robotDrive.ArcadeDrive(1, 0.0, false);
+    if (m_timer.Get() < 1_s) {// Drive forwards half speed, make sure to turn input squaring off
+      m_robotDrive.ArcadeDrive(0.5, 0.0
+      , false);
+      //  std::cout << encoderDistance << "\n";
     } else {
       // Stop robot
-      m_robotDrive.ArcadeDrive(0.0, 0.0, false);
+      m_robotDrive.StopMotor();
     }
   }
 
-  void driveFunction(){
-    m_robotDrive.ArcadeDrive(-m_controller.GetLeftY(), m_controller.GetRightX());
+  void TeleopInit() override {
+    m_encoder.Reset();
   }
-
-  void TeleopInit() override {}
 
   void TeleopPeriodic() override {
+    m_robotDrive.ArcadeDrive(m_controller.GetLeftX() * 0.5, m_controller.GetLeftY() * 0.5);
   }
 
-  void TestInit() override {}
-
-  void limitSwitchTest() {
-       //Drive with arcade style (use right stick to steer)
-       if (m_limitswitch.Get()) {
-        m_robotDrive.ArcadeDrive(0.0, 0.0);
-        m_encoder.Reset();
-       } else {
-         m_robotDrive.ArcadeDrive(-m_controller.GetLeftY(),
-                              m_controller.GetRightX());
-       }
+  void TestInit() override {
+    m_encoder.Reset();
   }
 
   void TestPeriodic() override {
-    driveFunction();
-    limitSwitchTest();
+  double encoderRate = m_encoder.GetRate();
+  double distancePerPulse = m_encoder.GetDistancePerPulse();
+  double encoderCount = m_encoder.Get();
+  double encoderDistance = m_encoder.GetDistance();
+  double ArcadeMoveA;
+  double ArcadeMoveB;
+  
+   ArcadeMoveA = -m_controller.GetLeftY()*0.5;
+   ArcadeMoveB = -m_controller.GetRightX()*0.5;
 
-    double encoderDistance = m_encoder.GetDistance();
-    std::cout << encoderDistance << "\n";
+  m_robotDrive.ArcadeDrive(ArcadeMoveA, ArcadeMoveB);
+  frc::SmartDashboard::PutNumber("Encoder distance: ", encoderDistance);
+  
+  //drive robot
 
-    if (m_encoder.GetStopped()){
-      fmt::print("Going!\n");
-    }
-    else{
-      fmt::print("Stopped!\n");
-    }
+  //------------------------------------------------------------------------------------------------------------
 
-  // if (m_controller.GetYButton()){
-  //   leftside_leader.Set(0.5);
-  // }
-  // else if (m_controller.GetXButton()){
-  //   rightside_leader.Set(0.5);
-  // }
+    //  if (m_controller.GetYButton()){ // if Y button is pressed
+    //    m_robotDrive.ArcadeDrive(0.3, 0.3); //set speed to 0.4 for variable speed = maxspeed*(1 - encoderDistance/2910) #or max encoder distance)
+    //    if (encoderDistance >= 970){
+    //     m_robotDrive.ArcadeDrive(0.3*(1-encoderDistance/2910), 0.3*(1-encoderDistance/2910));}
+  
+    //}
+    //  if (m_limitswitch.Get()) { //if limit switch is tripped OR encoder distance is >= 53
+    //    m_robotDrive.ArcadeDrive(0.0, 0.0); //stop motor altogether
+    //   } 
 
-    // frc::PWMVictorSPX victor{0}; 
-    // victor.Set(0.5);
-    // m_left.Set(0.05);
-    // testFunction();
+    // std::cout <<("Go!\n");
+    // std::cout << "Encoder rate: " << encoderRate << "\n";
+    //  std::cout << "Encoder Distance: " << encoderDistance << "\n";
+    // std::cout << "Distance Per Pulse: " << distancePerPulse << "\n";
+    // std::cout << "Encoder count: " << encoderCount << "\n";
+
   }
 
  private:
@@ -110,7 +123,7 @@ class Robot : public frc::TimedRobot {
 
   frc::XboxController m_controller{1};
   frc::Timer m_timer;
-  frc::DigitalInput m_limitswitch{8};
+  frc::DigitalInput m_limitswitch{2};
   frc::Encoder m_encoder{0,1};
 };
 
