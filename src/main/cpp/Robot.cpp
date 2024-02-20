@@ -15,9 +15,9 @@
 #include <frc/Encoder.h>
 #include <string>
 #include <frc/smartdashboard/SmartDashboard.h>
+#include <frc/smartdashboard/SendableChooser.h>
 
-
-// GLOBALS
+//2550 is the max range it can go
 
 class Robot : public frc::TimedRobot {
  public:
@@ -28,37 +28,66 @@ class Robot : public frc::TimedRobot {
     // We need to invert one side of the drivetrain so that positive voltages
     // result in both sides moving forward. Depending on how your robot's
     // gearbox is constructed, you might have to invert the left side instead.
-    leftside_leader.SetInverted(true);
     leftside_follower.Follow(leftside_leader);
-    leftside_follower.SetInverted(true);
     rightside_follower.Follow(rightside_leader);
+    rightside_leader.SetInverted(true);
+    armMotor2.Follow(armMotor1);
     m_robotDrive.SetExpiration(100_ms);
     m_timer.Start();
+    m_chooser.SetDefaultOption(kAutoNameDefault, kAutoNameDefault);
+    m_chooser.AddOption(kAutoNameCustom, kAutoNameCustom);
+    m_chooser.AddOption(kAutoNameCustom2, kAutoNameCustom2);
+    frc::SmartDashboard::PutData("Auto modes", &m_chooser);
     
-
-    frc::CameraServer::StartAutomaticCapture();
-
+    // frc::CameraServer::StartAutomaticCapture();
   }
 
 class armClass {
   public:
     int position;
-    void move_arm(int increment){
-      std::cout << increment << "\n";
+    int speed;
+    void moveArm(){
+      return;
     }
 };
 
-  void AutonomousInit() override { m_timer.Restart(); }
+class Shooter: public armClass {
+  int x = 0;
+};
+
+class Intake: public armClass{
+  int x = 0;
+};  
+
+ double calculateError(int desired){
+  double error = desired - m_encoder.GetDistance();
+  double motorOutput = p * error;
+  return motorOutput;
+}
+
+  void AutonomousInit() override { 
+    m_timer.Restart();
+    m_autoSelected = m_chooser.GetSelected();
+    fmt::print("Auto selected: {}\n", m_autoSelected);
+    }
 
   void AutonomousPeriodic() override {
-    // Drive for 2 seconds
-    if (m_timer.Get() < 1_s) {// Drive forwards half speed, make sure to turn input squaring off
+    //custom auto
+    if (m_autoSelected == kAutoNameCustom) {
+    std::cout << "The custom auto was selected!\n";
+  } 
+  else if (m_autoSelected == kAutoNameCustom2){
+    std::cout << "The 3rd auto was selected!\n";
+  }
+  else { //default auto
+        if (m_timer.Get() < 1_s) {
       m_robotDrive.ArcadeDrive(0.5, 0.0
       , false);
       //  std::cout << encoderDistance << "\n";
     } else {
       // Stop robot
       m_robotDrive.StopMotor();
+      }
     }
   }
 
@@ -67,47 +96,41 @@ class armClass {
   }
 
   void TeleopPeriodic() override {
-    m_robotDrive.ArcadeDrive(m_controller.GetLeftX() * 0.5, m_controller.GetLeftY() * 0.5);
+    m_robotDrive.ArcadeDrive(m_driveController.GetLeftX() * 0.5, m_driveController.GetLeftY() * 0.5);
   }
 
   void TestInit() override {
     m_encoder.Reset();
   }
 
-  void TestPeriodic() override {
+  void TestPeriodic() override { // move all to teleop eventually
+
   double encoderRate = m_encoder.GetRate();
   double distancePerPulse = m_encoder.GetDistancePerPulse();
   double encoderCount = m_encoder.Get();
   double encoderDistance = m_encoder.GetDistance();
   double ArcadeMoveA;
   double ArcadeMoveB;
-  
-   ArcadeMoveA = -m_controller.GetLeftY()*0.5;
-   ArcadeMoveB = -m_controller.GetRightX()*0.5;
 
-  m_robotDrive.ArcadeDrive(ArcadeMoveA, ArcadeMoveB);
   frc::SmartDashboard::PutNumber("Encoder distance: ", encoderDistance);
-  
-  //drive robot
+  frc::SmartDashboard::PutNumber("Encoder Distance Per Pulse: ", distancePerPulse);
+  frc::SmartDashboard::PutNumber("Encoder count: ", encoderCount);
+  frc::SmartDashboard::PutNumber("Encoder rate: ", encoderRate);
 
-  //------------------------------------------------------------------------------------------------------------
 
-    //  if (m_controller.GetYButton()){ // if Y button is pressed
-    //    m_robotDrive.ArcadeDrive(0.3, 0.3); //set speed to 0.4 for variable speed = maxspeed*(1 - encoderDistance/2910) #or max encoder distance)
-    //    if (encoderDistance >= 970){
-    //     m_robotDrive.ArcadeDrive(0.3*(1-encoderDistance/2910), 0.3*(1-encoderDistance/2910));}
-  
-    //}
-    //  if (m_limitswitch.Get()) { //if limit switch is tripped OR encoder distance is >= 53
-    //    m_robotDrive.ArcadeDrive(0.0, 0.0); //stop motor altogether
-    //   } 
+  // m_robotDrive.ArcadeDrive(calculateError(desired), 0.0, false);
 
-    // std::cout <<("Go!\n");
-    // std::cout << "Encoder rate: " << encoderRate << "\n";
-    //  std::cout << "Encoder Distance: " << encoderDistance << "\n";
-    // std::cout << "Distance Per Pulse: " << distancePerPulse << "\n";
-    // std::cout << "Encoder count: " << encoderCount << "\n";
+  m_robotDrive.ArcadeDrive(m_driveController.GetLeftX()*0.5, m_driveController.GetRightY()*0.5, false);
 
+  m_armDrive.ArcadeDrive(m_armController.GetLeftY(), 0.0, false);
+
+  // if (m_controller.GetYButton()){
+  //   desired = 2190; 
+  // }
+  // if (m_controller.GetXButton()){
+  //   desired = 4000;
+  // }
+    
   }
 
  private:
@@ -115,16 +138,38 @@ class armClass {
   WPI_TalonSRX rightside_leader{1};
   WPI_VictorSPX rightside_follower{2};
   WPI_VictorSPX leftside_leader{3};
-  WPI_TalonSRX leftside_follower{4};
+  WPI_VictorSPX leftside_follower{4};
+  WPI_VictorSPX armMotor1{5};
+  WPI_TalonSRX armMotor2{6};
+  WPI_VictorSPX motor_7{7};
+ // WPI_VictorSPX motor_8{8}; Motor 8 was clicking
+//WPI_VictorSPX motor_9{9};
+
 
   frc::DifferentialDrive m_robotDrive{
       [&](double output) { rightside_leader.Set(output); },
       [&](double output) { leftside_leader.Set(output); }};
 
-  frc::XboxController m_controller{1};
+
+  frc::DifferentialDrive m_armDrive{
+      [&](double output) { armMotor1.Set(output); },
+      [&](double output) { armMotor2.Set(output); }};
+
+  frc::XboxController m_driveController{0};
+  frc::XboxController m_armController{1};
   frc::Timer m_timer;
   frc::DigitalInput m_limitswitch{2};
   frc::Encoder m_encoder{0,1};
+
+  frc::SendableChooser<std::string> m_chooser;
+  const std::string kAutoNameDefault = "Default";
+  const std::string kAutoNameCustom = "My Auto";
+  const std::string kAutoNameCustom2 = "My Auto 2";
+  std::string m_autoSelected;
+
+  double position = 0;
+  int desired = 0;
+  double p = 0.03; //wobbly, fix later
 };
 
 #ifndef RUNNING_FRC_TESTS
