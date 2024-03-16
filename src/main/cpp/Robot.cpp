@@ -34,7 +34,7 @@ public:
 
     leftside_follower.Follow(leftside_leader); // follow the leader
     rightside_follower.Follow(rightside_leader);
-    rightside_leader.SetInverted(true);
+    rightside_leader.SetInverted(false);
     intake_motor.SetInverted(true);
 
     shooter_follower.Follow(shooter_leader);
@@ -47,26 +47,29 @@ public:
     m_robotDrive.SetExpiration(100_ms);
     m_timer.Start(); // autonomous timer
     m_shoot_timer.Start();
-    m_chooser.SetDefaultOption(kAutoLeftPos, kAutoLeftPos);
-    m_chooser.AddOption(kAutoMidPos, kAutoMidPos);          // custom autonomous mode 1
-    m_chooser.AddOption(kAutoRightPos, kAutoRightPos);      // custom autonomous mode 2
-    frc::SmartDashboard::PutData("Auto modes", &m_chooser); // pushes autonomous modes to the smartdashboard as selectable options
+
     frc::CameraServer::StartAutomaticCapture();
     m_encoder.Reset();
   }
 
-  void RobotPeriodic() override
-  {
+void RobotInit() override {
+    m_chooser.SetDefaultOption(kAutoMidPos, kAutoMidPos);
+    m_chooser.AddOption(kAutoLeftPos, kAutoLeftPos);          // custom autonomous mode 1
+    m_chooser.AddOption(kAutoRightPos, kAutoRightPos);
+    m_chooser.AddOption(kGoodAutoOtherRobots, kGoodAutoOtherRobots);     // custom autonomous mode 2
+    frc::SmartDashboard::PutData("Auto modes", &m_chooser); // pushes autonomous modes to the smartdashboard as selectable options
+}
+void RobotPeriodic() override{
     double encoderRate = m_encoder.GetRate();
     double distancePerPulse = m_encoder.GetDistancePerPulse();
     double encoderCount = m_encoder.Get();
     double encoderDistance = m_encoder.GetDistance();
 
-    frc::SmartDashboard::PutNumber("Encoder distance: ", encoderDistance);
+    frc::SmartDashboard::PutNumber("Encoder Distance: ", encoderDistance);
     frc::SmartDashboard::PutNumber("Encoder Distance Per Pulse: ", distancePerPulse);
     frc::SmartDashboard::PutNumber("Encoder count: ", encoderCount);
     frc::SmartDashboard::PutNumber("Encoder rate: ", encoderRate);
-  }
+}
 
   double calculateError(int desired)
   {                                                   // gradual slowdown
@@ -112,7 +115,7 @@ public:
     }
     else if (m_armController.GetAButton())
     {
-      desired = -160;
+      desired = armShootAngle;
     }
     else if (m_armController.GetBButton())
     {
@@ -130,14 +133,14 @@ public:
 
     if (m_shoot_timer.Get() < 0.2_s)
     {
-      intake_motor.Set(-0.2);
+      intake_motor.Set(-0.5);
     }
-    else if (m_shoot_timer.Get() < 1_s)
+    else if (m_shoot_timer.Get() < 0.7_s)
     {
       intake_motor.StopMotor();
       shooter_leader.Set(1);
     }
-    else if (m_shoot_timer.Get() < 3_s)
+    else if (m_shoot_timer.Get() < 1.5_s)
     {
       intake_motor.Set(1);
     }
@@ -164,27 +167,26 @@ public:
     {
       if (m_timer.Get() < 1_s) //sets arm down
       {
-        desired = -160;
+        desired = armShootAngle;
+      }
+      else if (m_timer.Get() < 2.5_s){
+        speakerShoot(); //shoots
       }
       else if (m_timer.Get() < 4_s)
       {
-        speakerShoot(); //shoots
-      }
-      else if (m_timer.Get() < 7_s)
-      {
         intake_motor.Set(1);
         shooter_leader.StopMotor();
-        m_robotDrive.ArcadeDrive(-0.3, 0.0, false); //forward & pick-up
+        m_robotDrive.ArcadeDrive(-0.4, 0.0, false); //forward & pick-up
         desired = -25;
         isShooting = false;
       }
-      else if (m_timer.Get() < 9_s)
+      else if (m_timer.Get() < 6.5_s)
       {
-        desired = -160;
-        intake_motor.StopMotor();
-        m_robotDrive.ArcadeDrive(0.3, 0.0, false); //drive backward
+        desired = armShootAngle;
+        intake_motor.Set(0.5); // Keep intaking slowly
+        m_robotDrive.ArcadeDrive(0.3, -0.0, false); //drive backward
       }
-      else if (m_timer.Get() < 12_s)
+      else if (m_timer.Get() < 8_s)
       {
         m_robotDrive.ArcadeDrive(0.0, 0.0, false); //shoots
         speakerShoot();
@@ -197,18 +199,95 @@ public:
 
     }
     // right field position
+
     else if (m_autoSelected == kAutoRightPos)
     {
-      if (m_timer.Get() < 3_s)
+      if (m_timer.Get() < 1_s) //sets arm down
       {
+        desired = armShootAngle;
+      }
+      else if (m_timer.Get() < 2.5_s){
+        speakerShoot(); //shoots
+      }
+      else if (m_timer.Get() < 4.5_s){
+        shooter_leader.StopMotor();
+        isShooting = false;
+        m_robotDrive.ArcadeDrive(-0.6, 0.8, false); // Drive forward and turn
+        desired = -25;
+        intake_motor.Set(1);
+      }
+      else if (m_timer.Get() < 6_s){
+        m_robotDrive.ArcadeDrive(-0.4, 0.0 , false);
+      }
+      else if (m_timer.Get() < 7_s)
+      {
+        desired = armShootAngle;
+        intake_motor.Set(0.3);
+        m_robotDrive.ArcadeDrive(0.4, 0.0, false); // Drive backward
+      }
+      else if (m_timer.Get() < 9_s){
+        m_robotDrive.ArcadeDrive(0.6, -0.65, false); // Drive backward and turn
+        intake_motor.StopMotor();
+      }
+      else if (m_timer.Get() < 11.5_s)
+      {
+        m_robotDrive.ArcadeDrive(0.0, 0.0, false); // stop and shoot
         speakerShoot();
       }
+      else {
+        isShooting = false;
+        shooter_leader.StopMotor();
+        intake_motor.StopMotor();
+      }
     }
+    
     // left field position
-    else
+    else if (m_autoSelected == kAutoLeftPos)
     {
-      std::cout << "Left position"
-                << "\n";
+       if (m_timer.Get() < 1_s) //sets arm down
+      {
+        desired = armShootAngle;
+      }
+      else if (m_timer.Get() < 2.5_s){
+        speakerShoot(); //shoots
+      }
+      else if (m_timer.Get() < 4_s)
+      {
+        intake_motor.Set(1);
+        shooter_leader.StopMotor();
+        m_robotDrive.ArcadeDrive(-0.3, 0.2, false); //forward & pick-up
+        desired = -25;
+        isShooting = false;
+      }
+      else if (m_timer.Get() < 5_s)
+      {
+        desired = armShootAngle;
+        intake_motor.StopMotor();
+        m_robotDrive.ArcadeDrive(0.4, -0.2, false); //drive backward
+      }
+      else if (m_timer.Get() < 6.5_s)
+      {
+        m_robotDrive.ArcadeDrive(0.0, 0.0, false); //shoots
+        speakerShoot();
+      }
+      else {
+        isShooting = false;
+        shooter_leader.StopMotor();
+        intake_motor.StopMotor();
+      }
+    }
+    //stop robot during auto
+    else {
+      if (m_timer.Get() < 12_s){
+        desired = -162;
+        m_robotDrive.ArcadeDrive(0.0, 0.0, false);
+      }
+      else if (m_timer.Get() < 15_s){
+        m_robotDrive.ArcadeDrive(-0.5, 0.0, false);
+      }
+      else {
+        m_robotDrive.ArcadeDrive(0.0, 0.0, false);
+      }
     }
     arm_leader.Set(calculateError(desired));
   }
@@ -302,12 +381,14 @@ private:
   const std::string kAutoLeftPos = "Position_Left";
   const std::string kAutoMidPos = "Position_Mid";
   const std::string kAutoRightPos = "Position_Right";
+  const std::string kGoodAutoOtherRobots = "other robots got good auto";
   std::string m_autoSelected;
 
   double position = 0;
   int desired = 0; // desired is the desired distance we want the motor to reach
   double p = 0.005;
   double throttle = 0.5;
+  double armShootAngle = -175;
 
   bool isShooting = false;
 
